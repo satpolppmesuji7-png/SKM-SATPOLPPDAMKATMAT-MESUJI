@@ -319,6 +319,7 @@
 
 <script>
     // Data Pertanyaan Lengkap dengan Deskripsi Penjelasan (Sesuai Foto)
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzmL4LgSeKQaSuXFqA8Nzv4ppMRgmM9bL0D7sGWo2nuS2qBH1fHSrqKGTOHVBcqtqK3aA/exec";
    const questions = [
         { id: 'u1', title: '1. Persyaratan Layanan', desc: 'Kejelasan dan kemudahan prosedur/syarat pengajuan pengaduan atau penanganan.' },
         { id: 'u2', title: '2. Sistem, Mekanisme, dan Prosedur', desc: 'Kemudahan tata cara dan alur pelayanan dari awal hingga selesai.' },
@@ -383,26 +384,30 @@
 
     // Submit Form
     document.getElementById('skmForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const formData = {
-            tgl: new Date().toLocaleDateString('id-ID'),
-            nama: document.getElementById('nama').value || 'Anonim',
-            jk: document.querySelector('input[name="jk"]:checked').value,
-            pendidikan: document.getElementById('pendidikan').value,
-            pekerjaan: document.getElementById('pekerjaan').value,
-            layanan: document.getElementById('layanan').value,
-            scores: questions.map(q => parseInt(document.querySelector(`input[name="${q.id}"]:checked`).value)),
-            saran: document.getElementById('saran').value || '-'
-        };
+    e.preventDefault();
+    const formData = {
+        tgl: new Date().toLocaleDateString('id-ID'),
+        nama: document.getElementById('nama').value || 'Anonim',
+        jk: document.querySelector('input[name="jk"]:checked').value,
+        pendidikan: document.getElementById('pendidikan').value,
+        pekerjaan: document.getElementById('pekerjaan').value,
+        layanan: document.getElementById('layanan').value,
+        scores: questions.map(q => parseInt(document.querySelector(`input[name="${q.id}"]:checked`).value)),
+        saran: document.getElementById('saran').value || '-'
+    };
 
-        const currentData = getData();
-        currentData.push(formData);
-        saveData(currentData);
-
+    fetch(SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify(formData)
+    })
+    .then(res => res.json())
+    .then(data => {
         alert('Terima kasih! Data survei kepuasan berhasil dikirim.');
         this.reset();
         switchTab('dashboard');
-    });
+    })
+    .catch(err => alert('Gagal mengirim data. Periksa koneksi Anda.'));
+});
 
     // Chart Variables
     let barChartInstance = null;
@@ -410,91 +415,86 @@
 
     // Render Grafik & Dashboard
     function updateDashboard() {
-        const data = getData();
-        document.getElementById('totalResponden').innerText = data.length;
+    fetch(SCRIPT_URL)
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('totalResponden').innerText = data.length;
+            if (data.length === 0) return;
 
-        if (data.length === 0) return;
+            const totalPerUnsur = Array(9).fill(0);
+            const countLayanan = {};
 
-        const totalPerUnsur = Array(9).fill(0);
-        const countLayanan = {};
-
-        data.forEach(row => {
-            row.scores.forEach((score, idx) => {
-                totalPerUnsur[idx] += score;
+            data.forEach(row => {
+                row.scores.forEach((score, idx) => {
+                    totalPerUnsur[idx] += Number(score);
+                });
+                countLayanan[row.layanan] = (countLayanan[row.layanan] || 0) + 1;
             });
-            countLayanan[row.layanan] = (countLayanan[row.layanan] || 0) + 1;
-        });
 
-        const avgPerUnsur = totalPerUnsur.map(total => total / data.length);
-        const avgTotalAll = avgPerUnsur.reduce((a, b) => a + b, 0) / 9;
-        const nilaiIKM = avgTotalAll * 25;
+            // Hitung rata-rata per unsur
+            const avgPerUnsur = totalPerUnsur.map(total => (total / data.length).toFixed(2));
+            
+            // Hitung total skor IKM (Skala 100)
+            const totalRataRata = avgPerUnsur.reduce((a, b) => Number(a) + Number(b), 0) / 9;
+            const ikmFinal = (totalRataRata * 25).toFixed(2);
+            
+            document.getElementById('ikmValue').innerText = ikmFinal;
 
-        document.getElementById('ikmValue').innerText = nilaiIKM.toFixed(2);
-        
-        let mutu = "Sangat Baik (A)";
-        if(nilaiIKM < 65) mutu = "Tidak Baik (D)";
-        else if(nilaiIKM < 76.61) mutu = "Kurang Baik (C)";
-        else if(nilaiIKM < 88.31) mutu = "Baik (B)";
-        document.getElementById('ikmMutu').innerText = `Mutu Pelayanan: ${mutu}`;
+            // Update Kategori Mutu
+            let mutu = 'D (Tidak Baik)';
+            if (ikmFinal >= 88.31) mutu = 'A (Sangat Baik)';
+            else if (ikmFinal >= 76.61) mutu = 'B (Baik)';
+            else if (ikmFinal >= 65.31) mutu = 'C (Kurang Baik)';
+            document.getElementById('ikmMutu').innerText = 'Mutu Pelayanan: ' + mutu;
 
-        // Render Bar Chart
-        const barCtx = document.getElementById('barChart').getContext('2d');
-        if (barChartInstance) barChartInstance.destroy();
-        barChartInstance = new Chart(barCtx, {
-            type: 'bar',
-            data: {
-                labels: ['U1', 'U2', 'U3', 'U4', 'U5', 'U6', 'U7', 'U8', 'U9'],
-                datasets: [{
-                    label: 'Skor Rata-Rata',
-                    data: avgPerUnsur,
-                    backgroundColor: '#1e3a8a',
-                    borderRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: { y: { min: 1, max: 4 } }
-            }
-        });
+            // Render Chart Batang
+            if (barChartInstance) barChartInstance.destroy();
+            const ctxBar = document.getElementById('barChart').getContext('2d');
+            barChartInstance = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: ['U1','U2','U3','U4','U5','U6','U7','U8','U9'],
+                    datasets: [{
+                        label: 'Rata-rata Nilai',
+                        data: avgPerUnsur,
+                        backgroundColor: '#1e3a8a'
+                    }]
+                },
+                options: { scales: { y: { min: 1, max: 4 } } }
+            });
 
-        // Render Doughnut Chart
-        const doughnutCtx = document.getElementById('doughnutChart').getContext('2d');
-        if (doughnutChartInstance) doughnutChartInstance.destroy();
-        doughnutChartInstance = new Chart(doughnutCtx, {
-            type: 'doughnut',
-            data: {
-                labels: Object.keys(countLayanan),
-                datasets: [{
-                    data: Object.values(countLayanan),
-                    backgroundColor: ['#1e3a8a', '#d97706', '#059669', '#3b82f6', '#8b5cf6']
-                }]
-            },
-            options: { responsive: true }
-        });
+            // Render Chart Lingkaran
+            if (doughnutChartInstance) doughnutChartInstance.destroy();
+            const ctxDoughnut = document.getElementById('doughnutChart').getContext('2d');
+            doughnutChartInstance = new Chart(ctxDoughnut, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(countLayanan),
+                    datasets: [{
+                        data: Object.values(countLayanan),
+                        backgroundColor: ['#1e3a8a', '#d97706', '#10b981', '#ef4444', '#8b5cf6']
+                    }]
+                }
+            });
 
-        // Render Tabel
-        const tbody = document.querySelector('#dataTable tbody');
-        tbody.innerHTML = '';
-        data.slice(-5).reverse().forEach(row => {
-            const avgScore = (row.scores.reduce((a,b) => a+b, 0) / 9).toFixed(2);
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${row.tgl}</td>
-                <td>${row.nama}</td>
-                <td>${row.layanan}</td>
-                <td>${avgScore} / 4.0</td>
-                <td>${row.saran}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-    }
-
-    function resetData() {
-        if(confirm('Apakah Anda yakin ingin menghapus seluruh data survei?')) {
-            localStorage.removeItem('skm_data');
-            location.reload();
-        }
-    }
+            // Render Tabel Riwayat
+            const tbody = document.getElementById('historyTableBody');
+            tbody.innerHTML = '';
+            data.slice().reverse().forEach(row => {
+                const avg = (row.scores.reduce((a,b)=>Number(a)+Number(b),0)/9).toFixed(2);
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${row.tgl}</td>
+                        <td>${row.nama}</td>
+                        <td>${row.layanan}</td>
+                        <td>${avg}</td>
+                        <td>${row.saran}</td>
+                    </tr>
+                `;
+            });
+        })
+        .catch(err => console.error('Gagal memuat data dashboard:', err));
+}
 </script>
 
 </body>
