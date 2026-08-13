@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi SKM & Dashboard - Satpol PP & Damkar Mesuji</title>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #1e3a8a;
+            --secondary: #d97706;
+            --success: #059669;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text: #1f2937;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            padding: 12px 24px;
+            background: #e5e7eb;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            font-weight: bold;
+            cursor: pointer;
+            color: #4b5563;
+        }
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+        .card {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 0 12px 12px 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+        .header h2 { margin: 0; color: var(--primary); text-transform: uppercase; font-size: 1.3rem; }
+        .header h3 { margin: 5px 0 0 0; color: var(--secondary); font-size: 1rem; }
+        
+        .form-group { margin-bottom: 18px; }
+        label { display: block; font-weight: bold; margin-bottom: 6px; }
+        input[type="text"], select, textarea {
+            width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;
+        }
+        .radio-group { display: flex; gap: 15px; }
+        .question-card {
+            background: #f9fafb; border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; margin-bottom: 15px;
+        }
+        .options { display: flex; gap: 10px; }
+        .option-btn {
+            flex: 1; padding: 8px; text-align: center; background: #fff; border: 1px solid #d1d5db; border-radius: 6px; cursor: pointer; font-size: 0.85rem;
+        }
+        input[type="radio"]:checked + .option-btn {
+            background: var(--primary); color: white; border-color: var(--primary);
+        }
+        .btn-submit {
+            background: var(--primary); color: white; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; font-size: 1rem;
+        }
+        .hidden-radio { display: none; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Dashboard Styles */
+        .ikm-box {
+            background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .ikm-value { font-size: 3rem; font-weight: bold; margin: 10px 0; }
+        .ikm-mutu { font-size: 1.2rem; font-weight: 600; color: #fbbf24; }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        @media (max-width: 768px) {
+            .charts-grid { grid-template-columns: 1fr; }
+            .options { flex-direction: column; }
+        }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #e5e7eb; padding: 10px; text-align: left; font-size: 0.9rem; }
+        th { background: #f3f4f6; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="nav-tabs">
+        <button class="tab-btn active" onclick="switchTab('form')">Formulir Survei</button>
+        <button class="tab-btn" onclick="switchTab('dashboard')">Dashboard Hasil & Grafik</button>
+    </div>
+
+    <!-- TAB FORMULIR -->
+    <div id="formTab" class="tab-content active card">
+        <div class="header">
+            <h2>Survei Kepuasan Masyarakat (SKM)</h2>
+            <h3>Satuan Polisi Pamong Praja, Pemadam Kebakaran dan Penyelamatan Kabupaten Mesuji</h3>
+        </div>
+
+        <form id="skmForm">
+            <div class="form-group">
+                <label for="nama">Nama Responden (Opsional):</label>
+                <input type="text" id="nama" placeholder="Masukkan nama Anda">
+            </div>
+
+            <div class="form-group">
+                <label>Jenis Kelamin:</label>
+                <div class="radio-group">
+                    <label><input type="radio" name="jk" value="Laki-Laki" required> Laki-Laki</label>
+                    <label><input type="radio" name="jk" value="Perempuan"> Perempuan</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="layanan">Jenis Layanan yang Diterima:</label>
+                <select id="layanan" required>
+                    <option value="">-- Pilih Jenis Layanan --</option>
+                    <option value="Trantibum">Pengaduan Gangguan Trantibum</option>
+                    <option value="Damkar">Pelayanan Pemadam Kebakaran</option>
+                    <option value="Rescue">Pelayanan Penyelamatan (Rescue)</option>
+                    <option value="Pengawalan">Permohonan Pengawalan / Pengamanan</option>
+                    <option value="Penegakan Perda">Pendampingan Penegakan Perda</option>
+                </select>
+            </div>
+
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #e5e7eb;">
+
+            <div id="questionsContainer"></div>
+
+            <div class="form-group">
+                <label for="saran">Saran & Masukan:</label>
+                <textarea id="saran" rows="3" placeholder="Tuliskan saran Anda..."></textarea>
+            </div>
+
+            <button type="submit" class="btn-submit">Kirim Hasil Survei</button>
+        </form>
+    </div>
+
+    <!-- TAB DASHBOARD -->
+    <div id="dashboardTab" class="tab-content card">
+        <div class="header">
+            <h2>Dashboard Hasil Indeks Kepuasan Masyarakat (IKM)</h2>
+            <h3>Satpol PP & Damkar Kabupaten Mesuji</h3>
+        </div>
+
+        <div class="ikm-box">
+            <div>NILAI INDEKS KEPUASAN MASYARAKAT (IKM)</div>
+            <div class="ikm-value" id="ikmValue">0.00</div>
+            <div class="ikm-mutu" id="ikmMutu">Belum Ada Data</div>
+            <div style="font-size: 0.85rem; margin-top: 5px;">Total Responden: <span id="totalResponden">0</span> orang</div>
+        </div>
+
+        <div class="charts-grid">
+            <div style="background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb;">
+                <h4 style="margin-top:0; text-align:center;">Rata-Rata Nilai per Unsur Pelayanan</h4>
+                <canvas id="barChart"></canvas>
+            </div>
+            <div style="background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb;">
+                <h4 style="margin-top:0; text-align:center;">Persentase Jenis Layanan</h4>
+                <canvas id="doughnutChart"></canvas>
+            </div>
+        </div>
+
+        <h4>Riwayat Responden Terakhir</h4>
+        <div style="overflow-x: auto;">
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>Tgl</th>
+                        <th>Nama</th>
+                        <th>Layanan</th>
+                        <th>Rata-rata Skor</th>
+                        <th>Saran</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <button onclick="resetData()" style="margin-top: 15px; background: #dc2626; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">Hapus Semua Data</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        { id: 'u1', title: 'U1. Persyaratan Layanan' },
+        { id: 'u2', title: 'U2. Sistem, Mekanisme, dan Prosedur' },
+        { id: 'u3', title: 'U3. Waktu Tanggap (Response Time)' },
+        { id: 'u4', title: 'U4. Biaya / Tarif' },
+        { id: 'u5', title: 'U5. Produk Spesifikasi Jenis Pelayanan' },
+        { id: 'u6', title: 'U6. Kompetensi Pelaksana' },
+        { id: 'u7', title: 'U7. Perilaku Pelaksana' },
+        { id: 'u8', title: 'U8. Penanganan Pengaduan' },
+        { id: 'u9', title: 'U9. Sarana dan Prasarana' }
+    ];
+
+    const optionsText = ['1 (Buruk)', '2 (Kurang)', '3 (Baik)', '4 (Sangat Baik)'];
+
+    // Render Pertanyaan Form
+    const container = document.getElementById('questionsContainer');
+    questions.forEach((q) => {
+        const qDiv = document.createElement('div');
+        qDiv.className = 'question-card';
+        let optionsHTML = '';
+        for (let i = 1; i <= 4; i++) {
+            optionsHTML += `
+                <label style="margin:0; flex:1;">
+                    <input type="radio" name="${q.id}" value="${i}" class="hidden-radio" required>
+                    <div class="option-btn">${optionsText[i-1]}</div>
+                </label>
+            `;
+        }
+        qDiv.innerHTML = `<div style="font-weight:bold; margin-bottom:8px;">${q.title}</div><div class="options">${optionsHTML}</div>`;
+        container.appendChild(qDiv);
+    });
+
+    // Handle Tab Switch
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        
+        if(tab === 'form') {
+            document.querySelectorAll('.tab-btn')[0].classList.add('active');
+            document.getElementById('formTab').classList.add('active');
+        } else {
+            document.querySelectorAll('.tab-btn')[1].classList.add('active');
+            document.getElementById('dashboardTab').classList.add('active');
+            updateDashboard();
+        }
+    }
+
+    // Storage Management
+    function getData() {
+        return JSON.parse(localStorage.getItem('skm_data')) || [];
+    }
+
+    function saveData(data) {
+        localStorage.setItem('skm_data', JSON.stringify(data));
+    }
+
+    // Submit Handler
+    document.getElementById('skmForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = {
+            tgl: new Date().toLocaleDateString('id-ID'),
+            nama: document.getElementById('nama').value || 'Anonim',
+            jk: document.querySelector('input[name="jk"]:checked').value,
+            layanan: document.getElementById('layanan').value,
+            scores: questions.map(q => parseInt(document.querySelector(`input[name="${q.id}"]:checked`).value)),
+            saran: document.getElementById('saran').value || '-'
+        };
+
+        const currentData = getData();
+        currentData.push(formData);
+        saveData(currentData);
+
+        alert('Terima kasih! Data survei berhasil dikirim.');
+        this.reset();
+        switchTab('dashboard');
+    });
+
+    // Chart Variables
+    let barChartInstance = null;
+    let doughnutChartInstance = null;
+
+    // Dashboard & Chart Render Logic
+    function updateDashboard() {
+        const data = getData();
+        document.getElementById('totalResponden').innerText = data.length;
+
+        if (data.length === 0) return;
+
+        // Calculate Average Scores per Question (U1 - U9)
+        const totalPerUnsur = Array(9).fill(0);
+        const countLayanan = {};
+
+        data.forEach(row => {
+            row.scores.forEach((score, idx) => {
+                totalPerUnsur[idx] += score;
+            });
+            countLayanan[row.layanan] = (countLayanan[row.layanan] || 0) + 1;
+        });
+
+        const avgPerUnsur = totalPerUnsur.map(total => total / data.length);
+        
+        // Calculate Total IKM (Skala 25 - 100 sesuai Standar PermenPANRB)
+        const avgTotalAll = avgPerUnsur.reduce((a, b) => a + b, 0) / 9;
+        const nilaiIKM = avgTotalAll * 25;
+
+        document.getElementById('ikmValue').innerText = nilaiIKM.toFixed(2);
+        
+        // Predikat Mutu
+        let mutu = "Sangat Baik (A)";
+        if(nilaiIKM < 65) mutu = "Tidak Baik (D)";
+        else if(nilaiIKM < 76.61) mutu = "Kurang Baik (C)";
+        else if(nilaiIKM < 88.31) mutu = "Baik (B)";
+        document.getElementById('ikmMutu').innerText = `Mutu Pelayanan: ${mutu}`;
+
+        // Render Bar Chart
+        const barCtx = document.getElementById('barChart').getContext('2d');
+        if (barChartInstance) barChartInstance.destroy();
+        barChartInstance = new Chart(barCtx, {
+            type: 'bar',
+            data: {
+                labels: ['U1', 'U2', 'U3', 'U4', 'U5', 'U6', 'U7', 'U8', 'U9'],
+                datasets: [{
+                    label: 'Rata-Rata Skor (1-4)',
+                    data: avgPerUnsur,
+                    backgroundColor: '#1e3a8a',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { min: 1, max: 4 } }
+            }
+        });
+
+        // Render Doughnut Chart
+        const doughnutCtx = document.getElementById('doughnutChart').getContext('2d');
+        if (doughnutChartInstance) doughnutChartInstance.destroy();
+        doughnutChartInstance = new Chart(doughnutCtx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(countLayanan),
+                datasets: [{
+                    data: Object.values(countLayanan),
+                    backgroundColor: ['#1e3a8a', '#d97706', '#059669', '#3b82f6', '#8b5cf6']
+                }]
+            },
+            options: { responsive: true }
+        });
+
+        // Render Table Data
+        const tbody = document.querySelector('#dataTable tbody');
+        tbody.innerHTML = '';
+        data.slice(-5).reverse().forEach(row => {
+            const avgScore = (row.scores.reduce((a,b) => a+b, 0) / 9).toFixed(2);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${row.tgl}</td>
+                <td>${row.nama}</td>
+                <td>${row.layanan}</td>
+                <td>${avgScore} / 4.0</td>
+                <td>${row.saran}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function resetData() {
+        if(confirm('Apakah Anda yakin ingin menghapus seluruh data survei?')) {
+            localStorage.removeItem('skm_data');
+            location.reload();
+        }
+    }
+</script>
+
+</body>
+</html>
